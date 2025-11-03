@@ -59,8 +59,9 @@ class Router
 
         $this->routes[] = $route;
 
-        // Cache static routes (no parameters) for O(1) lookup
-        if (strpos($uri, '{') === false) {
+        // Cache static routes (no parameters like {id}) for O(1) lookup
+        // Routes with parameters are matched using regex in the slow path
+        if (!str_contains($uri, '{')) {
             $key = $method . ':' . $uri;
             $this->staticRoutes[$key] = $route;
         }

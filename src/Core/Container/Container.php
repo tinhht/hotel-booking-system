@@ -86,7 +86,7 @@ class Container
             return $concrete($this);
         }
 
-        // Check reflection cache (optimized: stores only essential data to reduce memory)
+        // Check reflection cache (optimized: caches ReflectionClass and dependencies)
         if (!isset($this->reflectionCache[$concrete])) {
             try {
                 $reflection = new ReflectionClass($concrete);
@@ -100,8 +100,10 @@ class Container
 
             $constructor = $reflection->getConstructor();
 
-            // Cache only essential data: dependencies array to reduce memory footprint
+            // Cache reflection object and dependencies to avoid repeated introspection
+            // ReflectionClass is lightweight to store and needed for newInstanceArgs()
             $this->reflectionCache[$concrete] = [
+                'reflection' => $reflection,
                 'hasConstructor' => $constructor !== null,
                 'dependencies' => $constructor ? $constructor->getParameters() : []
             ];
@@ -114,11 +116,11 @@ class Container
             return new $concrete();
         }
 
-        // Resolve constructor dependencies
+        // Resolve constructor dependencies (cached, so no repeated getConstructor/getParameters calls)
         $instances = $this->resolveDependencies($cached['dependencies'], $parameters);
 
-        // Create instance with arguments (no need to cache reflection object)
-        return (new ReflectionClass($concrete))->newInstanceArgs($instances);
+        // Use cached reflection object for instantiation
+        return $cached['reflection']->newInstanceArgs($instances);
     }
 
     /**

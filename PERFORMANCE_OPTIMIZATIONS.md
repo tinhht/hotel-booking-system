@@ -25,14 +25,14 @@ This document outlines the performance improvements made to the Hotel Booking Sy
 **Problem**: The dependency injection container was using PHP Reflection on every object instantiation, causing significant overhead.
 
 **Solution**:
-- Implemented reflection result caching with optimized memory usage
-- Stores only essential data (hasConstructor flag and dependencies) to reduce memory footprint
-- Subsequent object creation reuses cached dependency data
-- ReflectionClass is instantiated only when needed for object creation
+- Implemented reflection result caching storing ReflectionClass, constructor flag, and dependencies
+- Caches the ReflectionClass object itself (lightweight and needed for newInstanceArgs)
+- Eliminates repeated calls to expensive getConstructor() and getParameters() operations
+- Subsequent object creation reuses cached reflection data
 
 **Impact**:
 - Reflection overhead reduced by ~90% for repeated class instantiation
-- Minimal memory footprint compared to caching full reflection objects
+- Avoids costly repeated introspection (getConstructor/getParameters)
 - Significant speedup in controller and service instantiation
 
 **Files Modified**: `src/Core/Container/Container.php`
@@ -46,13 +46,13 @@ This document outlines the performance improvements made to the Hotel Booking Sy
 **Solution**:
 - Replaced `while ($row = $stmt->fetch())` with `fetchAll()` + `array_map()`
 - Implemented prepared statement caching with efficient LRU eviction
-- Cache evicts 20% of entries at once using array_slice (avoids array_shift overhead)
+- Cache evicts 20% of entries at once using array_splice for immediate memory release
 - Added clear documentation for FULLTEXT index optimization on amenities column
 
 **Impact**:
 - Reduced memory copying overhead in result processing (6.5x faster in benchmarks)
 - Statement preparation overhead eliminated for repeated queries
-- Efficient cache eviction without array reindexing
+- Efficient in-place cache eviction with immediate memory release
 - 20-30% improvement in query execution time
 
 **Files Modified**: 

@@ -82,9 +82,9 @@ class Database
             if (!isset($this->queryCache[$cacheKey])) {
                 // Limit cache size to prevent memory issues (optimized eviction)
                 if (count($this->queryCache) >= $this->cacheMaxSize) {
-                    // Remove 20% of oldest entries efficiently using array_slice
+                    // Remove 20% of oldest entries efficiently using array_splice
                     $removeCount = (int)($this->cacheMaxSize * 0.2);
-                    $this->queryCache = array_slice($this->queryCache, $removeCount, null, true);
+                    array_splice($this->queryCache, 0, $removeCount);
                 }
                 $this->queryCache[$cacheKey] = $this->connection->prepare($sql);
             }
