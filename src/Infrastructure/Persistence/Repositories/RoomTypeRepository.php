@@ -62,9 +62,9 @@ class RoomTypeRepository implements RoomTypeRepositoryInterface
     public function findByAmenity(string $amenity): array
     {
         // TODO: Implement findByAmenity() method.
-        // Optimized: Use FULLTEXT index on amenities column for better performance
-        // Fallback to LIKE if FULLTEXT not available
-        // Note: For production, consider adding FULLTEXT index: ALTER TABLE room_types ADD FULLTEXT INDEX idx_amenities (amenities)
+        // Note: Currently uses LIKE for amenity search. For better performance in production,
+        // consider adding a FULLTEXT index: ALTER TABLE room_types ADD FULLTEXT INDEX idx_amenities (amenities)
+        // Then use: SELECT * FROM room_types WHERE MATCH(amenities) AGAINST(? IN BOOLEAN MODE)
         $stmt = $this->database->query(
             "SELECT * FROM room_types WHERE amenities LIKE ? ORDER BY price_per_night ASC",
             ['%' . $amenity . '%']

@@ -80,10 +80,11 @@ class Database
             $cacheKey = md5($sql);
             
             if (!isset($this->queryCache[$cacheKey])) {
-                // Limit cache size to prevent memory issues
+                // Limit cache size to prevent memory issues (optimized eviction)
                 if (count($this->queryCache) >= $this->cacheMaxSize) {
-                    // Remove oldest cached statement
-                    array_shift($this->queryCache);
+                    // Remove 20% of oldest entries efficiently using array_slice
+                    $removeCount = (int)($this->cacheMaxSize * 0.2);
+                    $this->queryCache = array_slice($this->queryCache, $removeCount, null, true);
                 }
                 $this->queryCache[$cacheKey] = $this->connection->prepare($sql);
             }
