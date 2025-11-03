@@ -14,6 +14,8 @@ class Router
     private array $groupMiddlewares = [];
     private string $prefix = '';
     private ?Container $container = null;
+    private array $middlewareCache = [];
+    private array $staticRoutes = [];
 
     /**
      * Set the container instance
@@ -47,13 +49,21 @@ class Router
         $uri = $this->prefix . $uri;
         $pattern = $this->convertToPattern($uri);
 
-        $this->routes[] = [
+        $route = [
             'method' => $method,
             'uri' => $uri,
             'pattern' => $pattern,
             'action' => $action,
             'middlewares' => $this->groupMiddlewares,
         ];
+
+        $this->routes[] = $route;
+
+        // Cache static routes (no parameters) for O(1) lookup
+        if (strpos($uri, '{') === false) {
+            $key = $method . ':' . $uri;
+            $this->staticRoutes[$key] = $route;
+        }
 
         return $this;
     }
@@ -114,6 +124,23 @@ class Router
 
         $uri = parse_url($uri, PHP_URL_PATH);
 
+        // Fast path: Check static routes first (O(1) lookup)
+        $staticKey = $method . ':' . $uri;
+        if (isset($this->staticRoutes[$staticKey])) {
+            $route = $this->staticRoutes[$staticKey];
+            
+            // Run middlewares
+            foreach ($route['middlewares'] as $middleware) {
+                $middlewareInstance = $this->resolveMiddleware($middleware);
+                if ($middlewareInstance && !$middlewareInstance->handle()) {
+                    return null;
+                }
+            }
+
+            return $this->callAction($route['action'], []);
+        }
+
+        // Slow path: Check dynamic routes with parameters
         foreach ($this->routes as $route) {
             if ($route['method'] !== $method) {
                 continue;
@@ -188,17 +215,24 @@ class Router
     }
 
     /**
-     * Resolve middleware instance
+     * Resolve middleware instance with caching
      */
     private function resolveMiddleware(string $middleware)
     {
+        // Return cached middleware instance if available
+        if (isset($this->middlewareCache[$middleware])) {
+            return $this->middlewareCache[$middleware];
+        }
+
         $middlewareClass = "App\\Presentation\\Middlewares\\{$middleware}";
 
         if (!class_exists($middlewareClass)) {
             return null;
         }
 
-        return new $middlewareClass();
+        // Cache the middleware instance
+        $this->middlewareCache[$middleware] = new $middlewareClass();
+        return $this->middlewareCache[$middleware];
     }
 
     /**

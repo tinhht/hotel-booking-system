@@ -8,6 +8,7 @@ namespace App\Presentation\Controllers\Api;
  */
 abstract class BaseRestController
 {
+    private static bool $corsHeadersSent = false;
 
     public function __construct()
     {
@@ -15,14 +16,21 @@ abstract class BaseRestController
     }
 
     /**
-     * Handle CORS preflight
+     * Handle CORS preflight (optimized to set headers only once)
      */
     protected function handleCors(): void
     {
+        // Avoid sending CORS headers multiple times
+        if (self::$corsHeadersSent) {
+            return;
+        }
+
         try {
             header('Access-Control-Allow-Origin: *');
             header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
             header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+
+            self::$corsHeadersSent = true;
 
             if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
                 header('Access-Control-Max-Age: 86400');
@@ -38,15 +46,12 @@ abstract class BaseRestController
 
 
     /**
-     * Send JSON response
+     * Send JSON response (CORS headers already set in constructor)
      */
     protected function json(mixed $data, int $statusCode = 200): void
     {
         http_response_code($statusCode);
         header('Content-Type: application/json; charset=utf-8');
-        header('Access-Control-Allow-Origin: *');
-        header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
 
         echo json_encode($data, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE);
         exit;
@@ -188,35 +193,26 @@ abstract class BaseRestController
     }
 
     /**
-     * Get session data
+     * Get session data (session already started in index.php)
      */
     protected function session(): array
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
         return $_SESSION ?? [];
     }
 
     /**
-     * Check if user is authenticated
+     * Check if user is authenticated (session already started in index.php)
      */
     protected function isAuthenticated(): bool
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
         return isset($_SESSION['user_id']);
     }
 
     /**
-     * Get current authenticated user
+     * Get current authenticated user (session already started in index.php)
      */
     protected function getCurrentUser(): ?array
     {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
         return $_SESSION['user'] ?? null;
     }
 

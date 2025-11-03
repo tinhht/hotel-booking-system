@@ -13,6 +13,8 @@ class Database
     private static ?Database $instance = null;
     private ?PDO $connection = null;
     private array $config;
+    private array $queryCache = [];
+    private int $cacheMaxSize = 100;
 
     /**
      * @throws \Exception
@@ -69,12 +71,24 @@ class Database
     }
 
     /**
-     * Execute a query
+     * Execute a query with prepared statement caching
      */
     public function query(string $sql, array $params = []): \PDOStatement
     {
         try {
-            $stmt = $this->connection->prepare($sql);
+            // Cache prepared statements to avoid repeated preparation
+            $cacheKey = md5($sql);
+            
+            if (!isset($this->queryCache[$cacheKey])) {
+                // Limit cache size to prevent memory issues
+                if (count($this->queryCache) >= $this->cacheMaxSize) {
+                    // Remove oldest cached statement
+                    array_shift($this->queryCache);
+                }
+                $this->queryCache[$cacheKey] = $this->connection->prepare($sql);
+            }
+            
+            $stmt = $this->queryCache[$cacheKey];
             $stmt->execute($params);
             return $stmt;
         } catch (PDOException $e) {

@@ -13,6 +13,7 @@ class Container
     private static ?Container $instance = null;
     private array $bindings = [];
     private array $instances = [];
+    private array $reflectionCache = [];
 
     private function __construct() {}
 
@@ -85,28 +86,39 @@ class Container
             return $concrete($this);
         }
 
-        try {
-            $reflection = new ReflectionClass($concrete);
-        } catch (ReflectionException $e) {
-            throw new \Exception("Class {$concrete} does not exist");
+        // Check reflection cache
+        if (!isset($this->reflectionCache[$concrete])) {
+            try {
+                $reflection = new ReflectionClass($concrete);
+            } catch (ReflectionException $e) {
+                throw new \Exception("Class {$concrete} does not exist");
+            }
+
+            if (!$reflection->isInstantiable()) {
+                throw new \Exception("Class {$concrete} is not instantiable");
+            }
+
+            $constructor = $reflection->getConstructor();
+
+            // Cache reflection data
+            $this->reflectionCache[$concrete] = [
+                'reflection' => $reflection,
+                'constructor' => $constructor,
+                'dependencies' => $constructor ? $constructor->getParameters() : []
+            ];
         }
 
-        if (!$reflection->isInstantiable()) {
-            throw new \Exception("Class {$concrete} is not instantiable");
-        }
-
-        $constructor = $reflection->getConstructor();
+        $cached = $this->reflectionCache[$concrete];
 
         // No constructor, just instantiate
-        if ($constructor === null) {
+        if ($cached['constructor'] === null) {
             return new $concrete();
         }
 
         // Resolve constructor dependencies
-        $dependencies = $constructor->getParameters();
-        $instances = $this->resolveDependencies($dependencies, $parameters);
+        $instances = $this->resolveDependencies($cached['dependencies'], $parameters);
 
-        return $reflection->newInstanceArgs($instances);
+        return $cached['reflection']->newInstanceArgs($instances);
     }
 
     /**

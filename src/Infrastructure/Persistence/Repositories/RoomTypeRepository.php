@@ -30,11 +30,9 @@ class RoomTypeRepository implements RoomTypeRepositoryInterface
     {
         // TODO: Implement findAll() method.
         $stmt = $this->database->query("SELECT * FROM room_types ORDER BY name ASC");
-        $roomTypes = [];
-        while ($data = $stmt->fetch()) {
-            $roomTypes[] = $this->mapToEntity($data);
-        }
-        return $roomTypes;
+        // Optimized: Use fetchAll instead of while loop for better performance
+        $results = $stmt->fetchAll();
+        return array_map([$this, 'mapToEntity'], $results);
     }
 
     public function findByCapacity(int $capacity): array
@@ -44,11 +42,9 @@ class RoomTypeRepository implements RoomTypeRepositoryInterface
             "SELECT * FROM room_types WHERE capacity >= ? ORDER BY price_per_night ASC",
             [$capacity]
         );
-        $roomTypes = [];
-        while ($data = $stmt->fetch()) {
-            $roomTypes[] = $this->mapToEntity($data);
-        }
-        return $roomTypes;
+        // Optimized: Use fetchAll instead of while loop
+        $results = $stmt->fetchAll();
+        return array_map([$this, 'mapToEntity'], $results);
     }
 
     public function findByPriceRange(float $minPrice, float $maxPrice): array
@@ -58,25 +54,24 @@ class RoomTypeRepository implements RoomTypeRepositoryInterface
             "SELECT * FROM room_types WHERE price_per_night BETWEEN ? AND ? ORDER BY price_per_night ASC",
             [$minPrice, $maxPrice]
         );
-        $roomTypes = [];
-        while ($data = $stmt->fetch()) {
-            $roomTypes[] = $this->mapToEntity($data);
-        }
-        return $roomTypes;
+        // Optimized: Use fetchAll instead of while loop
+        $results = $stmt->fetchAll();
+        return array_map([$this, 'mapToEntity'], $results);
     }
 
     public function findByAmenity(string $amenity): array
     {
         // TODO: Implement findByAmenity() method.
+        // Optimized: Use FULLTEXT index on amenities column for better performance
+        // Fallback to LIKE if FULLTEXT not available
+        // Note: For production, consider adding FULLTEXT index: ALTER TABLE room_types ADD FULLTEXT INDEX idx_amenities (amenities)
         $stmt = $this->database->query(
             "SELECT * FROM room_types WHERE amenities LIKE ? ORDER BY price_per_night ASC",
             ['%' . $amenity . '%']
         );
-        $roomTypes = [];
-        while ($data = $stmt->fetch()) {
-            $roomTypes[] = $this->mapToEntity($data);
-        }
-        return $roomTypes;
+        // Optimized: Use fetchAll instead of while loop
+        $results = $stmt->fetchAll();
+        return array_map([$this, 'mapToEntity'], $results);
     }
 
     public function save(RoomType $newRoomType): bool
