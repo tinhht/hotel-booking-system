@@ -13,6 +13,7 @@ class Container
     private static ?Container $instance = null;
     private array $bindings = [];
     private array $instances = [];
+    private array $reflectionCache = [];
 
     private function __construct() {}
 
@@ -85,28 +86,41 @@ class Container
             return $concrete($this);
         }
 
-        try {
-            $reflection = new ReflectionClass($concrete);
-        } catch (ReflectionException $e) {
-            throw new \Exception("Class {$concrete} does not exist");
+        // Check reflection cache (optimized: caches ReflectionClass and dependencies)
+        if (!isset($this->reflectionCache[$concrete])) {
+            try {
+                $reflection = new ReflectionClass($concrete);
+            } catch (ReflectionException $e) {
+                throw new \Exception("Class {$concrete} does not exist");
+            }
+
+            if (!$reflection->isInstantiable()) {
+                throw new \Exception("Class {$concrete} is not instantiable");
+            }
+
+            $constructor = $reflection->getConstructor();
+
+            // Cache reflection object and dependencies to avoid repeated introspection
+            // ReflectionClass is lightweight to store and needed for newInstanceArgs()
+            $this->reflectionCache[$concrete] = [
+                'reflection' => $reflection,
+                'hasConstructor' => $constructor !== null,
+                'dependencies' => $constructor ? $constructor->getParameters() : []
+            ];
         }
 
-        if (!$reflection->isInstantiable()) {
-            throw new \Exception("Class {$concrete} is not instantiable");
-        }
-
-        $constructor = $reflection->getConstructor();
+        $cached = $this->reflectionCache[$concrete];
 
         // No constructor, just instantiate
-        if ($constructor === null) {
+        if (!$cached['hasConstructor']) {
             return new $concrete();
         }
 
-        // Resolve constructor dependencies
-        $dependencies = $constructor->getParameters();
-        $instances = $this->resolveDependencies($dependencies, $parameters);
+        // Resolve constructor dependencies (cached, so no repeated getConstructor/getParameters calls)
+        $instances = $this->resolveDependencies($cached['dependencies'], $parameters);
 
-        return $reflection->newInstanceArgs($instances);
+        // Use cached reflection object for instantiation
+        return $cached['reflection']->newInstanceArgs($instances);
     }
 
     /**
